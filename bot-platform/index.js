@@ -1,4 +1,5 @@
 require('dotenv').config();
+const fs = require('fs'), path = require('path');
 const express = require('express'), session = require('express-session');
 const { Client, GatewayIntentBits } = require('discord.js');
 const { CLIENT_ID, CLIENT_SECRET, BOT_TOKEN, BASE_URL, SESSION_SECRET, PORT = 3000 } = process.env;
@@ -14,6 +15,13 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(session({ secret: SESSION_SECRET, resave: false, saveUninitialized: false,
   cookie: { maxAge: 7 * 864e5, secure: 'auto', sameSite: 'lax' } }));
+const DATA = path.join(__dirname, 'data'), UP = path.join(DATA, 'uploads');
+fs.mkdirSync(UP, { recursive: true });
+const CFG = path.join(DATA, 'config.json');
+const load = () => { try { return JSON.parse(fs.readFileSync(CFG)); } catch { return {}; } };
+const save = d => fs.writeFileSync(CFG, JSON.stringify(d, null, 1));
+app.use(express.json({ limit: '6mb' }));
+app.use('/uploads', express.static(UP));
 app.use(express.static('public'));
 
 const avatarOf = u => u.avatar
@@ -57,6 +65,45 @@ app.get('/api/guilds', (q, r) => {
         scope: 'bot applications.commands', permissions: '8', guild_id: g.id, disable_guild_select: 'true' })
     }));
   r.json(list);
+});
+
+// ===== المرحلة 2: التذاكر =====
+const manage = (q, id) => {
+  const g = (q.session.guilds || []).find(x => x.id === id);
+  return g && (g.owner || (BigInt(g.permissions) & 8n) === 8n) && bot.guilds.cache.has(id) ? bot.guilds.cache.get(id) : null;
+};
+const guard = (q, r, next) => { const g = manage(q, q.params.id); if (!g) return r.status(403).json({ error: 'غير مصرح' }); q.guild = g; next(); };
+
+app.get('/api/guild/:id/meta', guard, (q, r) => {
+  const g = q.guild;
+  r.json({
+    channels: g.channels.cache.filter(c => c.type === 0).sort((a, b) => a.position - b.position).map(c => ({ id: c.id, name: c.name })),
+    roles: g.roles.cache.filter(x => x.id !== g.id && !x.managed).sort((a, b) => b.position - a.position)
+      .map(x => ({ id: x.id, name: x.name, color: x.hexColor }))
+  });
+});
+
+app.get('/api/guild/:id/tickets', guard, (q, r) =>
+  r.json({ categories: [], channelId: '', logId: '', roles: [], bg: '', ...(load()[q.params.id] || {}) }));
+
+app.post('/api/guild/:id/tickets', guard, (q, r) => {
+  const g = q.guild, b = q.body || {}, all = load(), old = all[g.id] || {};
+  const cats = (Array.isArray(b.categories) ? b.categories : []).map(x => String(x).trim().slice(0, 30)).filter(Boolean).slice(0, 5);
+  const ch = id => (g.channels.cache.get(id)?.type === 0 ? id : '');
+  all[g.id] = { ...old, categories: cats, channelId: ch(b.channelId), logId: ch(b.logId),
+    roles: (Array.isArray(b.roles) ? b.roles : []).filter(id => g.roles.cache.has(id)) };
+  save(all); r.json({ ok: true });
+});
+
+app.post('/api/guild/:id/background', guard, (q, r) => {
+  const m = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(q.body?.data || '');
+  if (!m) return r.status(400).json({ error: 'صيغة غير مدعومة (png / jpg / webp)' });
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length > 4 * 1024 * 1024) return r.status(400).json({ error: 'الحجم أكبر من 4MB' });
+  const ext = m[1] === 'jpeg' ? 'jpg' : m[1], all = load();
+  fs.writeFileSync(path.join(UP, `${q.params.id}.${ext}`), buf);
+  all[q.params.id] = { ...(all[q.params.id] || {}), bg: `/uploads/${q.params.id}.${ext}?v=${Date.now()}` };
+  save(all); r.json({ bg: all[q.params.id].bg });
 });
 
 app.listen(PORT, () => console.log(`🌐 الموقع على ${BASE_URL}`));

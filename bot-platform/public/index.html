@@ -11,5 +11,14 @@
 <a class="btn gold big" href="/auth/login">ابدأ الآن</a></section>
 <section id="dash" hidden><h2>سيرفراتك</h2><p class="sub">السيرفرات الي أنت مالكها أو عندك فيها صلاحية أدمن</p><div id="guilds" class="grid"></div></section>
 <section id="manage" hidden><button class="btn ghost" id="back">← رجوع</button><h2 id="mTitle"></h2>
-<div class="card soon">🎫 قسم التذاكر — المرحلة الثانية</div></section>
+<div class="tabs"><span class="tab">التذاكر</span></div>
+<div class="card form">
+<h4>صورة خلفية التذكرة</h4><div class="bgbox" id="bgPrev">ما فيه خلفية بعد</div>
+<div class="row"><input type="file" id="bgFile" accept="image/png,image/jpeg,image/webp"><button class="btn green" id="bgUp">رفع الخلفية</button></div>
+<h4>فئات التذاكر <small>(حد أقصى 5 أزرار)</small></h4><div id="cats" class="chips"></div>
+<div class="row"><input id="catName" maxlength="30" placeholder="اسم الفئة، مثال: فتح تذكرة"><button class="btn ghost" id="catAdd">إضافة فئة</button></div>
+<h4>روم التذاكر</h4><select id="chT"></select>
+<h4>روم السجل</h4><select id="chL"></select>
+<h4>رتب المسؤولين <small>(الي ينمنشنون في التذكرة)</small></h4><div id="roles" class="chips"></div>
+<button class="btn gold big" id="save">حفظ الإعدادات</button></div><div id="toast"></div></section>
 </main><script src="app.js"></script></body></html>
